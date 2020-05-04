@@ -104,7 +104,12 @@ def stepImag(R, I, V, dx, dt, axes):
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Inew[i][j][k] = oneStepImag(i,j,k,R,I,V,dx,dt,axes)
+                S = R[i+1][j][k]-2*R[i][j][k]+R[i-1][j][k] +\
+                    R[i][j+1][k]-2*R[i][j][k]+R[i][j-1][k] +\
+                    R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
+
+                Inew[i][j][k] = I[i][j][k] + h*dt /\
+                    (2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
 
     # #Do the boundary
     # for i in [0, -1]:
@@ -113,12 +118,6 @@ def stepImag(R, I, V, dx, dt, axes):
 
     return Inew
 
-def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
-    S = R[i+1][j][k]-2*R[i][j][k]+R[i-1][j][k] +\
-        R[i][j+1][k]-2*R[i][j][k]+R[i][j-1][k] +\
-        R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
-
-    return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
 
 # Perform a step of the real wavefuntion
 def stepReal(R, I, V, dx, dt, axes):
@@ -127,8 +126,12 @@ def stepReal(R, I, V, dx, dt, axes):
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Rnew[i][j][k] = oneStepReal(i,j,k,R,I,V,dx,dt,axes)
-                
+                S = I[i+1][j][k]-2*I[i][j][k]+I[i-1][j][k] +\
+                    I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
+                    I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
+
+                Rnew[i][j][k] = R[i][j][k] - h*dt / \
+                    (2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
 
     # #Do the boundary
     # for i in [0, -1]:
@@ -136,13 +139,6 @@ def stepReal(R, I, V, dx, dt, axes):
     #         Rnew[i][j] = Rnew[3*i+1][3*i+1]
 
     return Rnew
-
-def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
-    S = I[i+1][j][k]-2*I[i][j][k]+I[i-1][j][k] +\
-        I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
-        I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
-
-    return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
 
 
 def step(R, I, V, dx, dt, axes):

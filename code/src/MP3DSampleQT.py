@@ -5,8 +5,11 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 import numpy as np
+import itertools
 from tqdm import tqdm
+from multiprocessing import Pool
 
+NCORES = 100
 
 def mag(x):
     return x.dot(x)**0.5
@@ -130,14 +133,15 @@ def stepReal(R, I, V, dx, dt, axes):
                 Rnew[i][j][k] = oneStepReal(i,j,k,R,I,V,dx,dt,axes)
                 
 
-    # #Do the boundary
-    # for i in [0, -1]:
-    #     for j in [0, -1]:
-    #         Rnew[i][j] = Rnew[3*i+1][3*i+1]
+    #Do the boundary
+    for i in [0, -1]:
+        for j in [0, -1]:
+            Rnew[i][j] = Rnew[3*i+1][3*i+1]
 
     return Rnew
 
 def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
+    
     S = I[i+1][j][k]-2*I[i][j][k]+I[i-1][j][k] +\
         I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
         I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
@@ -148,6 +152,35 @@ def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
 def step(R, I, V, dx, dt, axes):
     Inew = stepImag(R, I, V, dx, dt, axes)
     Rnew = stepReal(R, Inew, V, dx, dt, axes)
+
+    prob = abs(Rnew**2 + Inew*I)
+
+    return Rnew, Inew, prob
+
+
+def stepMT(R, I, V, dx, dt, axes):
+    with Pool(NCORES) as p:
+        # data = []
+        # for i in range(len(axes[0])):
+        #     for j in range(len(axes[1])):
+        #         for k in range(len(axes[2])):
+        #             data.append((i,j,k,R,I,V,axes))
+        
+        Inew = np.zeros(I.shape)
+        Rnew = np.zeros(R.shape)
+        Nx = len(axes[0])
+        Ny = len(axes[1])
+        Nz = len(axes[2])
+
+        Inew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepImag, (i, j, k, R, I, V, dx, dt, axes)).get() \
+            for i,j,k in itertools.product(range(1,Nx-1),range(1,Ny-1),range(1,Nz-1))])\
+                .reshape(Nx-2,Ny-2,Nz-2)
+        
+        Rnew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepReal, (i, j, k, R, I, V, dx, dt, axes)).get() \
+            for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))])\
+                .reshape(Nx-2,Ny-2,Nz-2)
+        
+
 
     prob = abs(Rnew**2 + Inew*I)
 
@@ -256,7 +289,7 @@ if __name__ == '__main__':
     def update():
         global R, I, i
         print(i)
-        R, I, prob = step(R, I, V, dx, dt, axes)
+        R, I, prob = stepMT(R, I, V, dx, dt, axes)
         if i%plotevery == 0:
             verts, faces = pg.isosurface(prob, prob.max()/level)
             print(prob.max())
