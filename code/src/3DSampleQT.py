@@ -34,7 +34,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     if K == None:
         K = np.zeros(dim)
-        K[1] = 400
+        K[1] = 10
 
     if x0 == None:
         x0 = np.zeros(dim)
@@ -56,7 +56,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
                     K[1]*axes[1][j] +\
                     K[2]*axes[2][k]
 
-                psi0[i][j][k] = 1#C*np.exp(-(sum/(s0**2)))*np.exp(kf*1j)
+                psi0[i][j][k] = C*np.exp(-(sum/(s0**2)))*np.exp(kf*1j)
 
     return psi0
 
@@ -79,7 +79,7 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
                 R = np.array([x, y, z])
 
                 if mag(R-x0)<= r**2:
-                    V[i][j][k] = 0#1e4
+                    V[i][j][k] = 0*1e4
 
                 # x1 = 0.8
                 # x2 = 0.5
@@ -92,8 +92,8 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
     return V
 
 def B(x,y,z):
-    B0 = 1e2
-    a = 100
+    B0 = 1e4
+    a = 10000
     return np.array([-a*x,0,B0+a*z])
 
 #########################################################
@@ -166,14 +166,14 @@ def step(R, I, V, dx, dt, axes):
 # To solve the wavefuncion
 # Simulation parameters
 dx = 0.05
-dt = 5e-5
+dt = 3e-5
 
 dim = int(3)
 h = 1
 m = 1
 L = 1
 q = -1
-spin = np.array([0,0,1/2])*h
+spin = np.array([-1/2,0,1/2])*h
 time = 10
 
 axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)

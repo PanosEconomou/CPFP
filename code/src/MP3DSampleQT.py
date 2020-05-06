@@ -37,12 +37,12 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     if K == None:
         K = np.zeros(dim)
-        K[0] = 400
+        K[0] = 40
 
     if x0 == None:
         x0 = np.zeros(dim)
-        x0[0] = 0.1
-        x0[1] = 0.5
+        x0[0] = 0.5
+        x0[1] = 0.2
         x0[2] = 0.5
 
     psi0 = np.zeros((Nx, Ny, Nz))*1j
@@ -192,7 +192,7 @@ def stepMT(R, I, V, dx, dt, axes):
 # To solve the wavefuncion
 # Simulation parameters
 dx = 0.05
-dt = 5e-5
+dt = 3e-5
 
 dim = int(3)
 h = 1
