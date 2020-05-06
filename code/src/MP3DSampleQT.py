@@ -12,7 +12,7 @@ import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import axes3d
 from timeit import default_timer as timer
 
-NCORES = 100
+NCORES = 1
 
 def mag(x):
     return x.dot(x)**0.5
@@ -183,15 +183,15 @@ def stepMT(R, I, V, dx, dt, axes):
         Ny = len(axes[1])
         Nz = len(axes[2])
 
-        # start = timer()
+        start = timer()
         data1 = [(i, j, k, R, I, V, dx, dt, axes) for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))]
-        # print("Table time: ",timer() - start)
-
-        # start = timer()
         Inew[1:Nx-1, 1:Ny-1, 1:Nz-1] = np.array(p.map(unpackerI, data1)).reshape(Nx-2,Ny-2,Nz-2)
-        # print("Solving time: ",timer() - start)
+        print("Solving time I: ",timer() - start)
+
+        start = timer()
         data2 = [(i, j, k, R, Inew, V, dx, dt, axes) for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))]
         Rnew[1:Nx-1, 1:Ny-1, 1:Nz-1] = np.array(p.map(unpackerR, data2)).reshape(Nx-2,Ny-2,Nz-2)
+        print("Solving time R: ", timer() - start)
 
         # Inew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepImag, (i, j, k, R, I, V, dx, dt, axes)).get() \
             # for i,j,k in itertools.product(range(1,Nx-1),range(1,Ny-1),range(1,Nz-1))])\
