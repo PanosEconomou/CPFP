@@ -263,12 +263,11 @@ if __name__ == '__main__':
 
     i = 0
     def update():
-        global R, I, i
-        print(i)
+        global R, I, prob, i
+        print(i, prob.max())
         R, I, prob = step(R, I, V, dx, dt, axes)
         if i%plotevery == 0:
             verts, faces = pg.isosurface(prob, prob.max()/level)
-            print(prob.max())
             md = gl.MeshData(vertexes=verts, faces=faces)
             colors = np.ones((md.faceCount(), 4), dtype=float)
             colors[:, 3] = 0.2

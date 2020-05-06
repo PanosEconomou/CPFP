@@ -6,11 +6,11 @@ import scipy.constants as c
 # import pyqtgraph.opengl as gl
 import numpy as np
 import itertools
-# from tqdm import tqdm
 from multiprocessing import Pool
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import axes3d
+from timeit import default_timer as timer
 
 NCORES = 100
 
@@ -40,12 +40,12 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     if K == None:
         K = np.zeros(dim)
-        K[1] = 40
+        K[1] = 10
 
     if x0 == None:
         x0 = np.zeros(dim)
         x0[0] = 0.5
-        x0[1] = 0.2
+        x0[1] = 0.5
         x0[2] = 0.5
 
     psi0 = np.zeros((Nx, Ny, Nz))*1j
@@ -84,8 +84,8 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
 
                 R = np.array([x, y, z])
 
-                if mag(R-x0)<= r**2:
-                    V[i][j][k] = 1e4
+                if mag(R-x0) <= r**2:
+                    V[i][j][k] = 0*1e4
 
                 # x1 = 0.8
                 # x2 = 0.5
@@ -96,6 +96,12 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
     # print(V)
 
     return V
+
+
+def B(x, y, z):
+    B0 = 1e4
+    a = 10000
+    return np.array([-a*x, 0, B0+a*z])
 
 #########################################################
 #########################################################
@@ -110,7 +116,7 @@ def stepImag(R, I, V, dx, dt, axes):
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Inew[i][j][k] = oneStepImag(i,j,k,R,I,V,dx,dt,axes)
+                Inew[i][j][k] = oneStepImag(i, j, k, R, I, V, dx, dt, axes)
 
     # #Do the boundary
     # for i in [0, -1]:
@@ -119,12 +125,15 @@ def stepImag(R, I, V, dx, dt, axes):
 
     return Inew
 
-def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
+
+def oneStepImag(i, j, k, R, I, V, dx, dt, axes):
     S = R[i+1][j][k]-2*R[i][j][k]+R[i-1][j][k] +\
         R[i][j+1][k]-2*R[i][j][k]+R[i][j-1][k] +\
         R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
 
-    return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
+    # return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
+    return I[i][j][k] + h*dt/(2*m*dx**2)*S + (q/h/m)*spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*R[i][j][k]*dt
+
 
 # Perform a step of the real wavefuntion
 def stepReal(R, I, V, dx, dt, axes):
@@ -133,23 +142,23 @@ def stepReal(R, I, V, dx, dt, axes):
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Rnew[i][j][k] = oneStepReal(i,j,k,R,I,V,dx,dt,axes)
-                
+                Rnew[i][j][k] = oneStepReal(i, j, k, R, I, V, dx, dt, axes)
 
-    #Do the boundary
-    for i in [0, -1]:
-        for j in [0, -1]:
-            Rnew[i][j] = Rnew[3*i+1][3*i+1]
+    # #Do the boundary
+    # for i in [0, -1]:
+    #     for j in [0, -1]:
+    #         Rnew[i][j] = Rnew[3*i+1][3*i+1]
 
     return Rnew
 
-def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
-    
+
+def oneStepReal(i, j, k, R, I, V, dx, dt, axes):
     S = I[i+1][j][k]-2*I[i][j][k]+I[i-1][j][k] +\
         I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
         I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
 
-    return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
+    # return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
+    return R[i][j][k] - h*dt/(2*m*dx**2)*S - (q/h/m)*spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*I[i][j][k]*dt
 
 
 def step(R, I, V, dx, dt, axes):
@@ -160,28 +169,37 @@ def step(R, I, V, dx, dt, axes):
 
     return Rnew, Inew, prob
 
+def unpackerI(args):
+    return oneStepImag(*args)
+
+def unpackerR(args):
+    return oneStepReal(*args)
 
 def stepMT(R, I, V, dx, dt, axes):
     with Pool(NCORES) as p:
-        # data = []
-        # for i in range(len(axes[0])):
-        #     for j in range(len(axes[1])):
-        #         for k in range(len(axes[2])):
-        #             data.append((i,j,k,R,I,V,axes))
-        
         Inew = np.zeros(I.shape)
         Rnew = np.zeros(R.shape)
         Nx = len(axes[0])
         Ny = len(axes[1])
         Nz = len(axes[2])
 
-        Inew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepImag, (i, j, k, R, I, V, dx, dt, axes)).get() \
-            for i,j,k in itertools.product(range(1,Nx-1),range(1,Ny-1),range(1,Nz-1))])\
-                .reshape(Nx-2,Ny-2,Nz-2)
+        # start = timer()
+        data1 = [(i, j, k, R, I, V, dx, dt, axes) for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))]
+        # print("Table time: ",timer() - start)
+
+        # start = timer()
+        Inew[1:Nx-1, 1:Ny-1, 1:Nz-1] = np.array(p.map(unpackerI, data1)).reshape(Nx-2,Ny-2,Nz-2)
+        # print("Solving time: ",timer() - start)
+        data2 = [(i, j, k, R, Inew, V, dx, dt, axes) for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))]
+        Rnew[1:Nx-1, 1:Ny-1, 1:Nz-1] = np.array(p.map(unpackerR, data2)).reshape(Nx-2,Ny-2,Nz-2)
+
+        # Inew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepImag, (i, j, k, R, I, V, dx, dt, axes)).get() \
+            # for i,j,k in itertools.product(range(1,Nx-1),range(1,Ny-1),range(1,Nz-1))])\
+            #     .reshape(Nx-2,Ny-2,Nz-2)
         
-        Rnew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepReal, (i, j, k, R, I, V, dx, dt, axes)).get() \
-            for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))])\
-                .reshape(Nx-2,Ny-2,Nz-2)
+        # Rnew[1:Nx-1,1:Ny-1,1:Nz-1] = np.array([p.apply_async(oneStepReal, (i, j, k, R, I, V, dx, dt, axes)).get() \
+        #     for i, j, k in itertools.product(range(1, Nx-1), range(1, Ny-1), range(1, Nz-1))])\
+        #         .reshape(Nx-2,Ny-2,Nz-2)
         
 
 
@@ -201,6 +219,8 @@ dim = int(3)
 h = 1
 m = 1
 L = 1
+q = -1
+spin = np.array([-1/2, 0, 1/2])*h
 time = 10
 
 axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
@@ -216,6 +236,9 @@ Iprev = psi.imag
 # Do half a time step to calculate the leapfrog imaginary.
 I = stepImag(R, Iprev, V, dx, dt/2, axes)
 prob = R**2 + Iprev*I
+
+
+
 
 
 #########################################################
@@ -257,10 +280,11 @@ def animInit():
 
 def update(i):
     # ax.set_title("Wavefunction over time\nTimestep: %d"%i)
-    for j in range(plotEvery):
-        global R, I
-        print(i)
+    for j in range(plotevery):
+        global R, I, prob
+        # start = timer()
         R, I, prob = stepMT(R, I, V, dx, dt, axes)
+        # print("END: ",timer()-start)
         print(i,prob.max())
 
     # wave.set_array((prob[:][:][sl]/prob.max()).ravel())
