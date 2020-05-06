@@ -1,13 +1,16 @@
 # Solve a 3D transient Wavefunction
 import numpy as np
 import scipy.constants as c
-from pyqtgraph.Qt import QtCore, QtGui
-import pyqtgraph as pg
-import pyqtgraph.opengl as gl
+# from pyqtgraph.Qt import QtCore, QtGui
+# import pyqtgraph as pg
+# import pyqtgraph.opengl as gl
 import numpy as np
 import itertools
-from tqdm import tqdm
+# from tqdm import tqdm
 from multiprocessing import Pool
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import axes3d
 
 NCORES = 100
 
@@ -37,7 +40,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     if K == None:
         K = np.zeros(dim)
-        K[0] = 40
+        K[1] = 40
 
     if x0 == None:
         x0 = np.zeros(dim)
@@ -47,7 +50,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     psi0 = np.zeros((Nx, Ny, Nz))*1j
 
-    for i in tqdm(range(len(axes[0]))):  # xaxis
+    for i in (range(len(axes[0]))):  # xaxis
         for j in range(len(axes[1])):  # yaxis
             for k in range(len(axes[2])):  # z axis
                 #set the wavefunction
@@ -72,7 +75,7 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
 
     V = np.zeros((Nx, Ny, Nz))
 
-    for i in tqdm(range(len(axes[0]))):
+    for i in (range(len(axes[0]))):
         for j in range(len(axes[1])):
             for k in range(len(axes[2])):
                 x = axes[0][i]
@@ -223,95 +226,151 @@ prob = R**2 + Iprev*I
 plotevery = 1
 level = 1.5
 Z = 0.5
-
-# Qt Setup
-app = QtGui.QApplication([])
-w = gl.GLViewWidget()
-w.show()
-w.setWindowTitle('pyqtgraph example: GLIsosurface')
-
-w.setCameraPosition(distance=20)
-
-g = gl.GLGridItem()
-g.scale(0.5, 0.5, 1)
-w.addItem(g)
-
-# Plot a the wavefunction isosurface
-verts, faces = pg.isosurface(prob, prob.max()/level)
-md = gl.MeshData(vertexes=verts, faces=faces)
-colors = np.ones((md.faceCount(), 4), dtype=float)
-colors[:, 3] = 0.2
-colors[:, 2] = np.linspace(1, 1, 1)
-md.setFaceColors(colors)
-
-m1 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
-m1.setGLOptions('additive')
-w.addItem(m1)
-m1.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
-
-
-#Plot the potential sphere
-verts, faces = pg.isosurface(V, V.max())
-md = gl.MeshData(vertexes=verts, faces=faces)
-colors = np.ones((md.faceCount(), 4), dtype=float)
-colors[:, 3] = 0.2
-colors[:, 2] = np.linspace(0.5, 0.5, 1)
-md.setFaceColors(colors)
-
-m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
-m2.setGLOptions('additive')
-w.addItem(m2)
-m2.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
-
-
-# Set up a slice view of it
-slice = gl.GLViewWidget()
-slice.show()
-slice.setWindowTitle('Slice view at a z-plane')
-
-slice.setCameraPosition(distance=1)
-
-g = gl.GLGridItem()
-g.scale(dx,dx,2)
-slice.addItem(g)
-
 sl = int(Z/dx)
-s = gl.GLSurfacePlotItem(x=axes[0],y=axes[1],z=prob[:][:][sl], shader='heightColor',smooth=False)
-s.translate(-L/2,-L/2,0)
 
-slice.addItem(s)
+#Create figure
+fig = plt.figure(figsize=(15, 15), dpi=40)
+ax = fig.add_subplot(111, projection='3d')
+plotEvery = 1
 
-## Start Qt event loop unless running in interactive mode.
-if __name__ == '__main__':
-    import sys
+# Axis specific
+ax.set_title("Wavefunction over time\nTimestep: 0")
+ax.set_xlabel("x-axis")
+ax.set_ylabel("y-axis")
 
-    i = 0
-    def update():
-        global R, I, i
+ax.set_xlim(0, L)
+ax.set_ylim(0, L)
+ax.set_zlim(0, 1)
+
+# wave = plt.pcolormesh(grid[0], grid[1], prob, cmap='gray_r', shading='gouraud')
+wireframe = None
+
+
+def animInit():
+    ax.set_xlim(0, L)
+    ax.set_ylim(0, L)
+
+    wave.set_array(prob.ravel())
+
+    return wave,
+
+
+def update(i):
+    # ax.set_title("Wavefunction over time\nTimestep: %d"%i)
+    for j in range(plotEvery):
+        global R, I
         print(i)
         R, I, prob = stepMT(R, I, V, dx, dt, axes)
-        if i%plotevery == 0:
-            verts, faces = pg.isosurface(prob, prob.max()/level)
-            print(prob.max())
-            md = gl.MeshData(vertexes=verts, faces=faces)
-            colors = np.ones((md.faceCount(), 4), dtype=float)
-            colors[:, 3] = 0.2
-            colors[:, 2] = np.linspace(1, 1, 1)
-            md.setFaceColors(colors)
-            m1.setMeshData(meshdata=md)
-            m1.meshDataChanged()
+        print(i,prob.max())
+
+    # wave.set_array((prob[:][:][sl]/prob.max()).ravel())
+    # print(i)
+
+    global wireframe
+    if wireframe:
+        ax.collections.remove(wireframe)
+    X,Y = np.meshgrid(axes[0],axes[1])
+    wireframe = ax.plot_wireframe(X,Y, prob[:][:][sl]/prob.max(), rstride=1, cstride=1, color='k', linewidth=0.5)
+
+    # return wave,
+
+
+# anim = animation.FuncAnimation(fig, update, init_func=animInit, frames=int(time/dt), interval=1, blit=False)
+anim = animation.FuncAnimation(fig, update, frames=500, interval=20, blit=False)
+# anim.save("example1.gif", fps=30, writer='imagemagick')
+
+plt.show()
+
+
+
+# # Qt Setup
+# app = QtGui.QApplication([])
+# w = gl.GLViewWidget()
+# w.show()
+# w.setWindowTitle('pyqtgraph example: GLIsosurface')
+
+# w.setCameraPosition(distance=20)
+
+# g = gl.GLGridItem()
+# g.scale(0.5, 0.5, 1)
+# w.addItem(g)
+
+# # Plot a the wavefunction isosurface
+# verts, faces = pg.isosurface(prob, prob.max()/level)
+# md = gl.MeshData(vertexes=verts, faces=faces)
+# colors = np.ones((md.faceCount(), 4), dtype=float)
+# colors[:, 3] = 0.2
+# colors[:, 2] = np.linspace(1, 1, 1)
+# md.setFaceColors(colors)
+
+# m1 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
+# m1.setGLOptions('additive')
+# w.addItem(m1)
+# m1.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
+
+
+# #Plot the potential sphere
+# verts, faces = pg.isosurface(V, V.max())
+# md = gl.MeshData(vertexes=verts, faces=faces)
+# colors = np.ones((md.faceCount(), 4), dtype=float)
+# colors[:, 3] = 0.2
+# colors[:, 2] = np.linspace(0.5, 0.5, 1)
+# md.setFaceColors(colors)
+
+# m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
+# m2.setGLOptions('additive')
+# w.addItem(m2)
+# m2.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
+
+
+# # Set up a slice view of it
+# slice = gl.GLViewWidget()
+# slice.show()
+# slice.setWindowTitle('Slice view at a z-plane')
+
+# slice.setCameraPosition(distance=1)
+
+# g = gl.GLGridItem()
+# g.scale(dx,dx,2)
+# slice.addItem(g)
+
+# sl = int(Z/dx)
+# s = gl.GLSurfacePlotItem(x=axes[0],y=axes[1],z=prob[:][:][sl], shader='heightColor',smooth=False)
+# s.translate(-L/2,-L/2,0)
+
+# slice.addItem(s)
+
+# ## Start Qt event loop unless running in interactive mode.
+# if __name__ == '__main__':
+#     import sys
+
+#     i = 0
+#     def update():
+#         global R, I, i
+#         print(i)
+#         R, I, prob = stepMT(R, I, V, dx, dt, axes)
+#         if i%plotevery == 0:
+#             verts, faces = pg.isosurface(prob, prob.max()/level)
+#             print(prob.max())
+#             md = gl.MeshData(vertexes=verts, faces=faces)
+#             colors = np.ones((md.faceCount(), 4), dtype=float)
+#             colors[:, 3] = 0.2
+#             colors[:, 2] = np.linspace(1, 1, 1)
+#             md.setFaceColors(colors)
+#             m1.setMeshData(meshdata=md)
+#             m1.meshDataChanged()
             
-            s.setData(z=prob[:][:][sl]/prob.max())
-        i += 1
+#             s.setData(z=prob[:][:][sl]/prob.max())
+#         i += 1
 
-    timer = QtCore.QTimer()
-    timer.timeout.connect(update)
-    timer.start(50)
+#     timer = QtCore.QTimer()
+#     timer.timeout.connect(update)
+#     timer.start(50)
 
-    pg.setConfigOptions(antialias=True)
+#     pg.setConfigOptions(antialias=True)
 
-    if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
+#     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+#         QtGui.QApplication.instance().exec_()
 
 
         
