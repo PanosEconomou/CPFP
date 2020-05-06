@@ -34,11 +34,11 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
 
     if K == None:
         K = np.zeros(dim)
-        K[0] = 400
+        K[1] = 400
 
     if x0 == None:
         x0 = np.zeros(dim)
-        x0[0] = 0.1
+        x0[0] = 0.5
         x0[1] = 0.5
         x0[2] = 0.5
 
@@ -56,7 +56,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
                     K[1]*axes[1][j] +\
                     K[2]*axes[2][k]
 
-                psi0[i][j][k] = C*np.exp(-(sum/(s0**2)))*np.exp(kf*1j)
+                psi0[i][j][k] = 1#C*np.exp(-(sum/(s0**2)))*np.exp(kf*1j)
 
     return psi0
 
@@ -79,7 +79,7 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
                 R = np.array([x, y, z])
 
                 if mag(R-x0)<= r**2:
-                    V[i][j][k] = 1e4
+                    V[i][j][k] = 0#1e4
 
                 # x1 = 0.8
                 # x2 = 0.5
@@ -90,6 +90,11 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
     # print(V)
 
     return V
+
+def B(x,y,z):
+    B0 = 1e2
+    a = 100
+    return np.array([-a*x,0,B0+a*z])
 
 #########################################################
 #########################################################
@@ -118,7 +123,9 @@ def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
         R[i][j+1][k]-2*R[i][j][k]+R[i][j-1][k] +\
         R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
 
-    return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
+    # return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
+    return I[i][j][k] + h*dt/(2*m*dx**2)*S + (q/h/m)*spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*R[i][j][k]*dt
+
 
 # Perform a step of the real wavefuntion
 def stepReal(R, I, V, dx, dt, axes):
@@ -142,8 +149,8 @@ def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
         I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
         I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
 
-    return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
-
+    # return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
+    return R[i][j][k] - h*dt/(2*m*dx**2)*S - (q/h/m)*spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
 
 def step(R, I, V, dx, dt, axes):
     Inew = stepImag(R, I, V, dx, dt, axes)
@@ -165,6 +172,8 @@ dim = int(3)
 h = 1
 m = 1
 L = 1
+q = -1
+spin = np.array([0,0,1/2])*h
 time = 10
 
 axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
