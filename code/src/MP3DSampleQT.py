@@ -12,7 +12,7 @@ import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import axes3d
 from timeit import default_timer as timer
 
-NCORES = 1
+NCORES = 100
 
 def mag(x):
     return x.dot(x)**0.5
