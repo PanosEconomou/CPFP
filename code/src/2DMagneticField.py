@@ -1,6 +1,6 @@
 # Calculates the magnetic field for arbitrary objects in two dimensions
 
-from LA import *
+# from LA import *
 import numpy as np
 from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
