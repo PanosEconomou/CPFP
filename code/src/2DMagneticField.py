@@ -1,12 +1,20 @@
-# Calculates the magnetic field for arbitrary objects in two dimensions
-
-# from LA import *
-import numpy as np
-from mpl_toolkits.mplot3d import axes3d
-import matplotlib.pyplot as plt
+# Let's use biot Savaart law
+import numpy as np 
 import scipy.constants as c
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import axes3d
+from tqdm import tqdm 
+
+
+###################################################################################
+###################################################################################
+# Simulation Functions
 
 dim = 3
+
+# Returns the magnitude of an arbitrary vector
+def mag(x):
+    return x.dot(x)**0.5
 
 #Creates dim axes, and also a meshgrid if helpful.
 def getGrid(dx: float, L: float = 1, Lx=None, Ly=None, Lz=None):
@@ -21,50 +29,6 @@ def getGrid(dx: float, L: float = 1, Lx=None, Ly=None, Lz=None):
     grid = np.meshgrid(*axes)
 
     return axes, grid
-
-# Creates a coefficient matrix for a particular J and axes
-def getCoefficientMatrix(axes,dx,J):
-
-    Nx = len(axes[0])
-    Ny = len(axes[1])
-    Nz = len(axes[2])
-
-    m = 4
-    d = 3
-    A = np.zeros((m*Nx*Ny*Nz, d*Nx*Ny*Nz))
-    B = np.zeros(m*Nx*Ny*Nz)
-
-    for i in range(0,Nx):
-        for j in range(0,Ny):
-            for k in range(0,Nz):
-                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+0][2+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = 1
-                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+0][2+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = -1
-                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+0][1+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = -1
-                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+0][1+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = 1
-
-                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+1][0+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = 1
-                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+1][0+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = -1
-                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+1][2+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = -1
-                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+1][2+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = 1
-
-                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+2][1+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = 1
-                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+2][1+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = -1
-                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+2][0+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = -1
-                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+2][0+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = 1
-
-                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+3][0+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = 1
-                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][0+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = -1
-                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+3][1+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = 1
-                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][1+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = -1
-                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+3][2+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = 1
-                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][2+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = -1
-
-                B[m*k+m*Nz*j+m*Ny*Nz*i+0] = 2*dx*J[i][j][k][0]*mu0
-                B[m*k+m*Nz*j+m*Ny*Nz*i+1] = 2*dx*J[i][j][k][1]*mu0
-                B[m*k+m*Nz*j+m*Ny*Nz*i+2] = 2*dx*J[i][j][k][2]*mu0
-                B[m*k+m*Nz*j+m*Ny*Nz*i+3] = 0
-
-    return A, B
 
 
 def getJ(axes,x0=np.array([0.5,0.5,0.5])):
@@ -89,49 +53,76 @@ def getJ(axes,x0=np.array([0.5,0.5,0.5])):
 
                     if abs(x**2+y**2 - 0.2**2) < 0.01:
                         if np.sqrt(x**2 + y**2) != 0:
-                            J[i][j][k] = Jmax*np.array([-x/np.sqrt(x**2 + y**2),y/np.sqrt(x**2 + y**2),0])
+                            J[i][j][k] = Jmax*np.array([y/np.sqrt(x**2 + y**2),-x/np.sqrt(x**2 + y**2),0])
                         else: 
                             J[i][j][k] = Jmax*np.array([0,0,0])
 
     return J
 
-def transpose(axes,B):
+
+# Calculates a processed list of all the points that contain a current field 
+def getJProcessed(axes,dx,J):
+
     Nx = len(axes[0])
     Ny = len(axes[1])
     Nz = len(axes[2])
 
-    m = 3
+    Jp = []
 
-    Bt = np.zeros((Nx,Ny,Nz,3))
-    for i in range(0, Nx):
-        for j in range(0, Ny):
-            for k in range(0, Nz):
-                Bt[i][j][k][0] = B[m*k+m*Nz*j+m*Ny*Nz*i+0]
-                Bt[i][j][k][1] = B[m*k+m*Nz*j+m*Ny*Nz*i+1]
-                Bt[i][j][k][2] = B[m*k+m*Nz*j+m*Ny*Nz*i+2]
+    for i in tqdm(range(0,Nx)):
+        for j in range(0,Ny):
+            for k in range(0,Nz):
+                if mag(J[i][j][k]) > 0:
+                    Jp.append([J[i][j][k],np.array([axes[0][i],axes[1][j],axes[2][k]])])
 
-    return Bt
+    return np.array(Jp)
 
 
-#########################################################
-#########################################################
-# Simulation Stuff
+# Ccalculates the magnetic field for one position based ont eh current
+def calcB(x,y,z, Jp, dx, mu0 = c.mu_0, delta=1e-3):
+    R = np.array([x,y,z])
+    
+    sum = np.array([0.]*dim)
+    for J in Jp:
+        r = R - J[1]
+        sum+= np.cross(J[0],r)/(mag(r)**3+delta)
+    sum*= mu0*dx**3/(4*np.pi)
 
-dx = 0.01
+    return sum
+
+
+def solveB(axes,Jp,dx,mu0=c.mu_0,delta=1e-3):
+    Nx = len(axes[0])
+    Ny = len(axes[1])
+    Nz = len(axes[2])
+
+    B = np.zeros((Nx,Ny,Nz,dim))
+
+    for i in tqdm(range(0,Nx)):
+        for j in range(0,Ny):
+            for k in range(0,Nz):
+                B[i][j][k] = calcB(axes[0][i],axes[1][j],axes[2][k],Jp,dx,mu0=mu0,delta=delta)
+    
+    return B
+
+
+
+
+###################################################################################
+###################################################################################
+# Simulation Commands
+
 L = 1
+dx = 0.05
 mu0 = c.mu_0
+delta = 1e-3
 
-axes,grid = getGrid(dx,L=L)
+axes,grid = getGrid(dx,L)
 J = getJ(axes)
-A,C = getCoefficientMatrix(axes,dx,J)
-# B = solve(A,C)
-# B = B.reshape(len(B))
-B = np.linalg.lstsq(A, C, rcond=-2)[0]
-file = open('out.txt', 'w+')
-file.write(str(B.tolist()))
-B = transpose(axes,B)
+Jp = getJProcessed(axes,dx,J)
 
-# plt.spy(A)
+B = solveB(axes,Jp,dx,mu0,delta)
+
 
 ########################################################
 ########################################################
@@ -151,7 +142,7 @@ ax.set_zlim(0, 1)
 
 print(B.max())
 
-ax.quiver(grid[0], grid[1], grid[2], J[:,:,:,0], J[:,:,:,1], J[:,:,:,2],length=0.1,color='darkblue')
-ax.quiver(grid[0], grid[1], grid[2], B[:,:,:,0], B[:,:,:,1], B[:,:,:,2],length=1,color='darkred')
+ax.quiver(grid[0], grid[1], grid[2], J[:,:,:,1], J[:,:,:,0], J[:,:,:,2],length=0.1,color='darkblue')
+ax.quiver(grid[0], grid[1], grid[2], B[:,:,:,1], B[:,:,:,0], B[:,:,:,2],length=1e7,color='darkred')
 
 plt.show()
