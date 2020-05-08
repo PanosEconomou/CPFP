@@ -29,38 +29,40 @@ def getCoefficientMatrix(axes,dx,J):
     Ny = len(axes[1])
     Nz = len(axes[2])
 
-    A = np.zeros((4*Nx*Ny*Nz, 4*Nx*Ny*Nz))
-    B = np.zeros(4*Nx*Ny*Nz)
+    m = 4
+    d = 3
+    A = np.zeros((m*Nx*Ny*Nz, d*Nx*Ny*Nz))
+    B = np.zeros(m*Nx*Ny*Nz)
 
     for i in range(0,Nx):
         for j in range(0,Ny):
             for k in range(0,Nz):
-                A[k+Nz*j+Ny*Nz*i+0][2+k+Nz*(j+1)+Ny*Nz*i] = 1
-                A[k+Nz*j+Ny*Nz*i+0][2+k+Nz*(j-1)+Ny*Nz*i] = -1
-                A[k+Nz*j+Ny*Nz*i+0][1+(k+1)+Nz*j+Ny*Nz*i] = -1
-                A[k+Nz*j+Ny*Nz*i+0][1+(k-1)+Nz*j+Ny*Nz*i] = 1
+                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+0][2+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = 1
+                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+0][2+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = -1
+                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+0][1+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = -1
+                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+0][1+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = 1
 
-                A[k+Nz*j+Ny*Nz*i+1][0+(k+1)+Nz*j+Ny*Nz*i] = 1
-                A[k+Nz*j+Ny*Nz*i+1][0+(k-1)+Nz*j+Ny*Nz*i] = -1
-                A[k+Nz*j+Ny*Nz*i+1][2+k+Nz*j+Ny*Nz*(i+1)] = -1
-                A[k+Nz*j+Ny*Nz*i+1][2+k+Nz*j+Ny*Nz*(i-1)] = 1
+                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+1][0+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = 1
+                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+1][0+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = -1
+                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+1][2+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = -1
+                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+1][2+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = 1
 
-                A[k+Nz*j+Ny*Nz*i+2][1+k+Nz*j+Ny*Nz*(i+1)] = 1
-                A[k+Nz*j+Ny*Nz*i+2][1+k+Nz*j+Ny*Nz*(i-1)] = -1
-                A[k+Nz*j+Ny*Nz*i+2][0+k+Nz*(j+1)+Ny*Nz*i] = -1
-                A[k+Nz*j+Ny*Nz*i+2][0+k+Nz*(j-1)+Ny*Nz*i] = 1
+                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+2][1+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = 1
+                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+2][1+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = -1
+                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+2][0+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = -1
+                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+2][0+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = 1
 
-                A[k+Nz*j+Ny*Nz*i+3][0+k+Nz*j+Ny*Nz*(i+1)] = 1
-                A[k+Nz*j+Ny*Nz*i+3][0+k+Nz*j+Ny*Nz*(i-1)] = -1
-                A[k+Nz*j+Ny*Nz*i+3][1+k+Nz*(j+1)+Ny*Nz*i] = 1
-                A[k+Nz*j+Ny*Nz*i+3][1+k+Nz*(j-1)+Ny*Nz*i] = -1
-                A[k+Nz*j+Ny*Nz*i+3][2+(k+1)+Nz*j+Ny*Nz*i] = 1
-                A[k+Nz*j+Ny*Nz*i+3][2+(k-1)+Nz*j+Ny*Nz*i] = -1
+                if i+1 <  Nx: A[m*k+m*Nz*j+m*Ny*Nz*i+3][0+d*k+d*Nz*j+d*Ny*Nz*(i+1)] = 1
+                if i-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][0+d*k+d*Nz*j+d*Ny*Nz*(i-1)] = -1
+                if j+1 <  Ny: A[m*k+m*Nz*j+m*Ny*Nz*i+3][1+d*k+d*Nz*(j+1)+d*Ny*Nz*i] = 1
+                if j-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][1+d*k+d*Nz*(j-1)+d*Ny*Nz*i] = -1
+                if k+1 <  Nz: A[m*k+m*Nz*j+m*Ny*Nz*i+3][2+d*(k+1)+d*Nz*j+d*Ny*Nz*i] = 1
+                if k-1 >=  0: A[m*k+m*Nz*j+m*Ny*Nz*i+3][2+d*(k-1)+d*Nz*j+d*Ny*Nz*i] = -1
 
-                B[k+Nz*j+Ny*Nz*i+0] = 2*dx*J[i][j][k][0]*mu0
-                B[k+Nz*j+Ny*Nz*i+1] = 2*dx*J[i][j][k][1]*mu0
-                B[k+Nz*j+Ny*Nz*i+2] = 2*dx*J[i][j][k][2]*mu0
-                B[k+Nz*j+Ny*Nz*i+3] = 0
+                B[m*k+m*Nz*j+m*Ny*Nz*i+0] = 2*dx*J[i][j][k][0]*mu0
+                B[m*k+m*Nz*j+m*Ny*Nz*i+1] = 2*dx*J[i][j][k][1]*mu0
+                B[m*k+m*Nz*j+m*Ny*Nz*i+2] = 2*dx*J[i][j][k][2]*mu0
+                B[m*k+m*Nz*j+m*Ny*Nz*i+3] = 0
 
     return A, B
 
@@ -75,21 +77,21 @@ def getJ(axes,x0=np.array([0.5,0.5,0.5])):
 
     J = np.zeros((Nx,Ny,Nz,3))
 
-    for i in range(0,Nx):
-        J[i][int(Ny/2)][int(Nz/2)] = np.array([1,0,0])
-    # for i in range(0, Nx):
-    #     for j in range(0, Ny):
-    #         for k in range(0, Nz):
+    # for i in range(0,Nx):
+    #     J[i][int(Ny/2)][int(Nz/2)] = np.array([1,0,0])
+    for i in range(0, Nx):
+        for j in range(0, Ny):
+            for k in range(0, Nz):
 
-    #             if axes[2][k] >= 0.5:
-    #                 x = axes[0][i]-x0[0]
-    #                 y = axes[1][j]-x0[1]
+                if axes[2][k] >= 0.5:
+                    x = axes[0][i]-x0[0]
+                    y = axes[1][j]-x0[1]
 
-    #                 if abs(x**2+y**2 - 0.2**2) < 0.01:
-    #                     if np.sqrt(x**2 + y**2) != 0:
-    #                         J[i][j][k] = Jmax*np.array([-x/np.sqrt(x**2 + y**2),y/np.sqrt(x**2 + y**2),0])
-    #                     else: 
-    #                         J[i][j][k] = Jmax*np.array([0,0,0])
+                    if abs(x**2+y**2 - 0.2**2) < 0.01:
+                        if np.sqrt(x**2 + y**2) != 0:
+                            J[i][j][k] = Jmax*np.array([-x/np.sqrt(x**2 + y**2),y/np.sqrt(x**2 + y**2),0])
+                        else: 
+                            J[i][j][k] = Jmax*np.array([0,0,0])
 
     return J
 
@@ -98,13 +100,15 @@ def transpose(axes,B):
     Ny = len(axes[1])
     Nz = len(axes[2])
 
+    m = 3
+
     Bt = np.zeros((Nx,Ny,Nz,3))
     for i in range(0, Nx):
         for j in range(0, Ny):
             for k in range(0, Nz):
-                Bt[i][j][k][0] = B[k+Nz*j+Ny*Nz*i+0]
-                Bt[i][j][k][1] = B[k+Nz*j+Ny*Nz*i+1]
-                Bt[i][j][k][2] = B[k+Nz*j+Ny*Nz*i+2]
+                Bt[i][j][k][0] = B[m*k+m*Nz*j+m*Ny*Nz*i+0]
+                Bt[i][j][k][1] = B[m*k+m*Nz*j+m*Ny*Nz*i+1]
+                Bt[i][j][k][2] = B[m*k+m*Nz*j+m*Ny*Nz*i+2]
 
     return Bt
 
@@ -113,21 +117,21 @@ def transpose(axes,B):
 #########################################################
 # Simulation Stuff
 
-dx = 0.1
+dx = 0.01
 L = 1
 mu0 = c.mu_0
 
 axes,grid = getGrid(dx,L=L)
 J = getJ(axes)
 A,C = getCoefficientMatrix(axes,dx,J)
-
-B = solve(A,C)
-B = B.reshape(len(B))
+# B = solve(A,C)
+# B = B.reshape(len(B))
+B = np.linalg.lstsq(A, C, rcond=-2)[0]
 file = open('out.txt', 'w+')
-for b in B:
-    file.write(str(b)+',')
-file.close()
+file.write(str(B.tolist()))
 B = transpose(axes,B)
+
+# plt.spy(A)
 
 ########################################################
 ########################################################
@@ -147,7 +151,7 @@ ax.set_zlim(0, 1)
 
 print(B.max())
 
-ax.quiver(grid[0], grid[1], grid[2], J[:,:,:,1], J[:,:,:,0], J[:,:,:,2],length=0.1,color='darkblue')
-ax.quiver(grid[0], grid[1], grid[2], B[:,:,:,0], B[:,:,:,1], B[:,:,:,2],length=1e-102,color='darkred')
+ax.quiver(grid[0], grid[1], grid[2], J[:,:,:,0], J[:,:,:,1], J[:,:,:,2],length=0.1,color='darkblue')
+ax.quiver(grid[0], grid[1], grid[2], B[:,:,:,0], B[:,:,:,1], B[:,:,:,2],length=1,color='darkred')
 
 plt.show()

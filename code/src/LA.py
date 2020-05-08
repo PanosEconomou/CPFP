@@ -12,6 +12,7 @@
 
 import numpy as np 
 import scipy.constants as c
+import matplotlib.pyplot as plt
 import scipy.linalg
 from tqdm import tqdm
 
@@ -122,9 +123,12 @@ def solve(A,b,VERBOSE = True):
     """
 
     if VERBOSE: print("LU Decomposition of Matrix A")
-    # L,U = LUdecomp(A)
-    L, U = scipy.linalg.lu(A, permute_l=True)
-    print(L,U)
+    L,U = LUdecomp(A)
+    # L, U = scipy.linalg.lu(A, permute_l=True)
+    plt.spy(L)
+    plt.show()
+    plt.spy(U)
+    plt.show()
     if VERBOSE: print("LU Decomposition of Matrix A Successfull")
 
     if VERBOSE: print("Solving for Ly = b")
