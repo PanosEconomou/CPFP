@@ -269,13 +269,13 @@ ax.set_zlim(0, 1)
 wireframe = None
 
 
-def animInit():
-    ax.set_xlim(0, L)
-    ax.set_ylim(0, L)
+# def animInit():
+#     ax.set_xlim(0, L)
+#     ax.set_ylim(0, L)
 
-    wave.set_array(prob.ravel())
+#     wave.set_array(prob.ravel())
 
-    return wave,
+#     return wave,
 
 
 def update(i):
