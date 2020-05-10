@@ -8,6 +8,13 @@ import numpy as np
 from tqdm import tqdm
 # from BS import *
 
+MULTIPROCESSING = True
+CPUs = 4
+
+if MULTIPROCESSING:
+    from multiprocessing import Process, Queue
+    import itertools
+
 
 def mag(x):
     return x.dot(x)**0.5
@@ -33,9 +40,9 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
     Ny = int(len(axes[1]))
     Nz = int(len(axes[2]))
 
-    if K == None:
+    if type(K) == type(None):
         K = np.zeros(dim)
-        K[1] = 10
+        K[1] = 100
 
     if x0 == None:
         x0 = np.zeros(dim)
@@ -92,9 +99,10 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
 
     return V
 
-def B(x,y,z):
-    B0 = 1e4
-    a = 10000
+# def getBformfile(filename):
+    
+
+def B(x,y,z,B0 = 1e4, a = 10000, beta = 1):
     return np.array([-a*x,0,B0+a*z])/beta
 
 #########################################################
@@ -104,13 +112,13 @@ def B(x,y,z):
 # Perform a step of the imaginary wavefuntion
 
 
-def stepImag(R, I, V, dx, dt, axes):
+def stepImag(R, I, V, spin, dx, dt, axes):
     Inew = np.zeros(I.shape)
     #Do everything but the boundary
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Inew[i][j][k] = oneStepImag(i,j,k,R,I,V,dx,dt,axes)
+                Inew[i][j][k] = oneStepImag(i,j,k,R,I,V,spin,dx,dt,axes)
 
     # #Do the boundary
     # for i in [0, -1]:
@@ -119,7 +127,7 @@ def stepImag(R, I, V, dx, dt, axes):
 
     return Inew
 
-def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
+def oneStepImag(i,j,k,R,I,V,spin,dx,dt,axes):
     S = R[i+1][j][k]-2*R[i][j][k]+R[i-1][j][k] +\
         R[i][j+1][k]-2*R[i][j][k]+R[i][j-1][k] +\
         R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
@@ -131,13 +139,13 @@ def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
 
 
 # Perform a step of the real wavefuntion
-def stepReal(R, I, V, dx, dt, axes):
+def stepReal(R, I, V, spin, dx, dt, axes):
     Rnew = np.zeros(R.shape)
     #Do everything but the boundary
     for i in range(1, len(axes[0])-1):
         for j in range(1, len(axes[1])-1):
             for k in range(1, len(axes[2])-1):
-                Rnew[i][j][k] = oneStepReal(i,j,k,R,I,V,dx,dt,axes)
+                Rnew[i][j][k] = oneStepReal(i,j,k,R,I,V,spin,dx,dt,axes)
                 
 
     # #Do the boundary
@@ -147,7 +155,7 @@ def stepReal(R, I, V, dx, dt, axes):
 
     return Rnew
 
-def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
+def oneStepReal(i,j,k,R,I,V,spin,dx,dt,axes):
     S = I[i+1][j][k]-2*I[i][j][k]+I[i-1][j][k] +\
         I[i][j+1][k]-2*I[i][j][k]+I[i][j-1][k] +\
         I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
@@ -157,130 +165,192 @@ def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
     return R[i][j][k] - dt/(2*dx**2)*S - spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
 
 
-def step(R, I, V, dx, dt, axes):
-    Inew = stepImag(R, I, V, dx, dt, axes)
-    Rnew = stepReal(R, Inew, V, dx, dt, axes)
+def process(func,Q,args,R,I,V,spin,dx,dt,axes):
+    for arg in args:
+        Q.put([arg[0],arg[1],arg[2],func(*arg,R,I,V,spin,dx,dt,axes)])
+
+def step(R, I, V, spin, dx, dt, axes):
+    if not MULTIPROCESSING:
+        Inew = stepImag(R, I, V, spin, dx, dt, axes)
+        Rnew = stepReal(R, Inew, V, spin, dx, dt, axes)
+    
+    else:
+        Nx = len(axes[0])
+        Ny = len(axes[1])
+        Nz = len(axes[2])
+
+        # Generate the argument list
+        iters = itertools.product(range(1,Nx-1), range(1, Ny-1), range(1, Nz-1))
+        args = np.array([[i,j,k] for i,j,k in iters])
+        args = np.array_split(args,CPUs,axis = 0)
+
+        # Start solving for the imaginary component
+        Inew = np.zeros(I.shape)
+        Q = Queue()
+
+        # Generate processes
+        processes = []
+        for arg in args:
+            processes.append(Process(target=process,args=(oneStepImag,Q,arg,R,I,V,spin,dx,dt,axes)))
+        
+        for p in processes:
+            p.start()
+
+        while True:
+            running = any(p.is_alive() for p in processes)
+            while not Q.empty():
+                q = Q.get()
+                Inew[q[0]][q[1]][q[2]]=q[3]
+            if not running:
+                break
+
+        # Start solving for the Real component
+        Rnew = np.zeros(R.shape)
+        Q = Queue()
+
+        # Generate processes
+        processes = []
+        for arg in args:
+            processes.append(Process(target=process,args=(oneStepReal,Q,arg,R,Inew,V,spin,dx,dt,axes)))
+        
+        for p in processes:
+            p.start()
+
+        while True:
+            running = any(p.is_alive() for p in processes)
+            while not Q.empty():
+                q = Q.get()
+                Rnew[q[0]][q[1]][q[2]]=q[3]
+            if not running:
+                break
+
 
     prob = abs(Rnew**2 + Inew*I)
 
     return Rnew, Inew, prob
 
 
-#########################################################
-#########################################################
-# To solve the wavefuncion
-# Simulation parameters
-dx = 0.05
-dt = 3e-5
 
-dim = int(3)
-
-# Nonedimentionalisation
-m = c.m_e   # Particle mass in Kg
-q = -c.e    # Particle charge in C (As)
-
-beta = 1    # B = beta*Bbar (Nondimentionalisation constant for B)
-
-hbar = c.hbar
-gamma = q/m     # Gyrometric ratio (relativistically corrected)
-
-L0      = (hbar/(m*gamma*beta))**0.5     # Nondimentionalised Length Coefficient
-T0      = 1/(gamma*beta)                 # Nondimentionalised Time Coefficient
-spin    = np.array([-1/2,0,1/2])         # Nondimentionalised spin
-L       = 1                              # Nondimentionalised container length
-time    = 10                             # Nondimentionalised time
-
-
-axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
-
-# Initial conditions
-V = getV(axes)
-
-psi = getPsi0(axes)
-
-R = psi.real
-Iprev = psi.imag
-
-# Do half a time step to calculate the leapfrog imaginary.
-I = stepImag(R, Iprev, V, dx, dt/2, axes)
-prob = R**2 + Iprev*I
-
-
-#########################################################
-#########################################################
-# Plotting and stuffs
-
-# Plotting Variables
-plotevery = 1
-level = 1.5
-Z = 0.5
-
-# Qt Setup
-app = QtGui.QApplication([])
-w = gl.GLViewWidget()
-w.show()
-w.setWindowTitle('pyqtgraph example: GLIsosurface')
-
-w.setCameraPosition(distance=20)
-
-g = gl.GLGridItem()
-g.scale(0.5, 0.5, 1)
-w.addItem(g)
-
-# Plot a the wavefunction isosurface
-verts, faces = pg.isosurface(prob, prob.max()/level)
-md = gl.MeshData(vertexes=verts, faces=faces)
-colors = np.ones((md.faceCount(), 4), dtype=float)
-colors[:, 3] = 0.2
-colors[:, 2] = np.linspace(1, 1, 1)
-md.setFaceColors(colors)
-
-m1 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
-m1.setGLOptions('additive')
-w.addItem(m1)
-m1.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
-
-
-#Plot the potential sphere
-verts, faces = pg.isosurface(V, V.max())
-md = gl.MeshData(vertexes=verts, faces=faces)
-colors = np.ones((md.faceCount(), 4), dtype=float)
-colors[:, 3] = 0.2
-colors[:, 2] = np.linspace(0.5, 0.5, 1)
-md.setFaceColors(colors)
-
-m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
-m2.setGLOptions('additive')
-w.addItem(m2)
-m2.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
-
-
-# Set up a slice view of it
-slice = gl.GLViewWidget()
-slice.show()
-slice.setWindowTitle('Slice view at a z-plane')
-
-slice.setCameraPosition(distance=1)
-
-g = gl.GLGridItem()
-g.scale(dx,dx,2)
-slice.addItem(g)
-
-sl = int(Z/dx)
-s = gl.GLSurfacePlotItem(x=axes[0],y=axes[1],z=prob[:][:][sl], shader='heightColor',smooth=False)
-s.translate(-L/2,-L/2,0)
-
-slice.addItem(s)
 
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
+    
+    #########################################################
+    #########################################################
+    # To solve the wavefuncion
+    # Simulation parameters
+    dx = 0.05
+    dt = 1e-4
+
+    dim = int(3)
+
+    # Nonedimentionalisation
+    m = c.m_e   # Particle mass in Kg
+    q = c.e     # Particle charge in C (As)
+
+    beta = 1    # B = beta*Bbar (Nondimentionalisation constant for B)
+
+    hbar = c.hbar
+    gamma = q/m     # Gyrometric ratio (relativistically corrected)
+
+    L0      = (hbar/(m*gamma*beta))**0.5     # Nondimentionalised Length Coefficient
+    T0      = 1/(gamma*beta)                 # Nondimentionalised Time Coefficient
+    spin    = np.array([1/2,0,1/2])         # Nondimentionalised spin
+    L       = 1                              # Nondimentionalised container length
+    time    = 10                             # Nondimentionalised time
+    
+    v0 = np.array([0,1e-10,0])*L0/T0
+    Kbar = v0/L0
+    print(Kbar)
+
+    axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
+
+    # Initial conditions
+    V = getV(axes)
+
+    psi = getPsi0(axes,K=Kbar)
+
+    R = psi.real
+    Iprev = psi.imag
+
+    # Do half a time step to calculate the leapfrog imaginary.
+    I = stepImag(R, Iprev, V, spin, dx, dt/2, axes)
+    prob = R**2 + Iprev*I
+
+
+
+    #########################################################
+    #########################################################
+    # Plotting and stuffs
     import sys
+
+    # Plotting Variables
+    plotevery = 1
+    level = 1.5
+    Z = 0.5
+
+    # Qt Setup
+    app = QtGui.QApplication([])
+    w = gl.GLViewWidget()
+    w.show()
+    w.setWindowTitle('pyqtgraph example: GLIsosurface')
+
+    w.setCameraPosition(distance=20)
+
+    g = gl.GLGridItem()
+    g.scale(0.5, 0.5, 1)
+    w.addItem(g)
+
+    # Plot a the wavefunction isosurface
+    verts, faces = pg.isosurface(prob, prob.max()/level)
+    md = gl.MeshData(vertexes=verts, faces=faces)
+    colors = np.ones((md.faceCount(), 4), dtype=float)
+    colors[:, 3] = 0.2
+    colors[:, 2] = np.linspace(1, 1, 1)
+    md.setFaceColors(colors)
+
+    m1 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
+    m1.setGLOptions('additive')
+    w.addItem(m1)
+    m1.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
+
+
+    #Plot the potential sphere
+    verts, faces = pg.isosurface(V, V.max())
+    md = gl.MeshData(vertexes=verts, faces=faces)
+    colors = np.ones((md.faceCount(), 4), dtype=float)
+    colors[:, 3] = 0.2
+    colors[:, 2] = np.linspace(0.5, 0.5, 1)
+    md.setFaceColors(colors)
+
+    m2 = gl.GLMeshItem(meshdata=md, smooth=True, shader='balloon')
+    m2.setGLOptions('additive')
+    w.addItem(m2)
+    m2.translate(-L/(2*dx), -L/(2*dx), -L/(2*dx))
+
+
+    # Set up a slice view of it
+    slice = gl.GLViewWidget()
+    slice.show()
+    slice.setWindowTitle('Slice view at a z-plane')
+
+    slice.setCameraPosition(distance=1)
+
+    g = gl.GLGridItem()
+    g.scale(dx,dx,2)
+    slice.addItem(g)
+
+    sl = int(Z/dx)
+    s = gl.GLSurfacePlotItem(x=axes[0],y=axes[1],z=prob[:][:][sl], shader='heightColor',smooth=False)
+    s.translate(-L/2,-L/2,0)
+
+    slice.addItem(s)
 
     i = 0
     def update():
         global R, I, prob, i
         print(i, prob.max())
-        R, I, prob = step(R, I, V, dx, dt, axes)
+        R, I, prob = step(R, I, V, spin, dx, dt, axes)
         if i%plotevery == 0:
             verts, faces = pg.isosurface(prob, prob.max()/level)
             md = gl.MeshData(vertexes=verts, faces=faces)
