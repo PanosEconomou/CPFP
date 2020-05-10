@@ -6,6 +6,7 @@ import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 import numpy as np
 from tqdm import tqdm
+# from BS import *
 
 
 def mag(x):
@@ -94,7 +95,7 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
 def B(x,y,z):
     B0 = 1e4
     a = 10000
-    return np.array([-a*x,0,B0+a*z])
+    return np.array([-a*x,0,B0+a*z])/beta
 
 #########################################################
 #########################################################
@@ -124,7 +125,9 @@ def oneStepImag(i,j,k,R,I,V,dx,dt,axes):
         R[i][j][k+1]-2*R[i][j][k]+R[i][j][k-1]
 
     # return I[i][j][k] + h*dt/(2*m*dx**2)*S - (1/h)*V[i][j][k]*dt*R[i][j][k]
-    return I[i][j][k] + h*dt/(2*m*dx**2)*S + (q/h/m)*spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*R[i][j][k]*dt
+    # return I[i][j][k] + h*dt/(2*m*dx**2)*S + (q/h/m)*spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*R[i][j][k]*dt
+    return I[i][j][k] + dt/(2*dx**2)*S + spin.dot(B(axes[0][i], axes[1][j], axes[2][k]))*R[i][j][k]*dt
+
 
 
 # Perform a step of the real wavefuntion
@@ -150,7 +153,9 @@ def oneStepReal(i,j,k,R,I,V,dx,dt,axes):
         I[i][j][k+1]-2*I[i][j][k]+I[i][j][k-1]
 
     # return R[i][j][k] - h*dt/(2*m*dx**2)*S + (1/h)*V[i][j][k]*dt*I[i][j][k]
-    return R[i][j][k] - h*dt/(2*m*dx**2)*S - (q/h/m)*spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
+    # return R[i][j][k] - h*dt/(2*m*dx**2)*S - (q/h/m)*spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
+    return R[i][j][k] - dt/(2*dx**2)*S - spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
+
 
 def step(R, I, V, dx, dt, axes):
     Inew = stepImag(R, I, V, dx, dt, axes)
@@ -169,12 +174,22 @@ dx = 0.05
 dt = 3e-5
 
 dim = int(3)
-h = 1
-m = 1
-L = 1
-q = -1
-spin = np.array([-1/2,0,1/2])*h
-time = 10
+
+# Nonedimentionalisation
+m = c.m_e   # Particle mass in Kg
+q = -c.e    # Particle charge in C (As)
+
+beta = 1    # B = beta*Bbar (Nondimentionalisation constant for B)
+
+hbar = c.hbar
+gamma = q/m     # Gyrometric ratio (relativistically corrected)
+
+L0      = (hbar/(m*gamma*beta))**0.5     # Nondimentionalised Length Coefficient
+T0      = 1/(gamma*beta)                 # Nondimentionalised Time Coefficient
+spin    = np.array([-1/2,0,1/2])         # Nondimentionalised spin
+L       = 1                              # Nondimentionalised container length
+time    = 10                             # Nondimentionalised time
+
 
 axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
 
