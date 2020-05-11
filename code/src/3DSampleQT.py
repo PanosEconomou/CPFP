@@ -7,11 +7,10 @@ import pyqtgraph.opengl as gl
 import pyqtgraph.exporters
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
-# from numba import jit, cuda 
+from tqdm import tqdm 
 # from BS import *
 
-MULTIPROCESSING = False
+MULTIPROCESSING = True
 CPUs = 4
 
 if MULTIPROCESSING:
@@ -188,11 +187,21 @@ def oneStepReal(i,j,k,R,I,V,spin,dx,dt,axes):
     return R[i][j][k] - dt/(2*dx**2)*S - spin.dot(B(axes[0][i],axes[1][j],axes[2][k]))*I[i][j][k]*dt
 
 
-def process(func,Q,args,R,I,V,spin,dx,dt,axes):
+def process(func,Q,args,R,I,V,spin,dx,dt,axes,VERBOSE=True):
+    cnt = 0
     for arg in args:
-        Q.put([arg[0],arg[1],arg[2],func(*arg,R,I,V,spin,dx,dt,axes)])
+        # if VERBOSE:
+        #     if int(cnt/len(args)*100/CPUs)%1 == 0: 
+        #         print('*',end = '')
+        #         cnt -= 1*len(args)/100*CPUs
+        #         cnt = int(cnt)
+        # print(arg)
 
-def step(R, I, V, spin, dx, dt, axes):
+        Q.put([arg[0],arg[1],arg[2],func(*arg,R,I,V,spin,dx,dt,axes)])
+    if VERBOSE:print("\tReturning.")
+    return
+
+def step(R, I, V, spin, dx, dt, axes, VERBOSE=True):
     if not MULTIPROCESSING:
         Inew = stepImag(R, I, V, spin, dx, dt, axes)
         Rnew = stepReal(R, Inew, V, spin, dx, dt, axes)
@@ -203,22 +212,28 @@ def step(R, I, V, spin, dx, dt, axes):
         Nz = len(axes[2])
 
         # Generate the argument list
+        if VERBOSE:print("Generating Argument List")
         iters = itertools.product(range(1,Nx-1), range(1, Ny-1), range(1, Nz-1))
         args = np.array([[i,j,k] for i,j,k in iters])
         args = np.array_split(args,CPUs,axis = 0)
 
         # Start solving for the imaginary component
+        if VERBOSE: print("Solving for I")
         Inew = np.zeros(I.shape)
         Q = Queue()
 
         # Generate processes
+        if VERBOSE: print("Generating Processes List")
         processes = []
         for arg in args:
-            processes.append(Process(target=process,args=(oneStepImag,Q,arg,R,I,V,spin,dx,dt,axes)))
+            processes.append(Process(target=process,args=(oneStepImag,Q,arg,R,I,V,spin,dx,dt,axes,VERBOSE)))
         
+        if VERBOSE: print("Starting processes")
         for p in processes:
             p.start()
+            if VERBOSE: print("\t",p.name," started.")
 
+        if VERBOSE: print("Reassembling")
         while True:
             running = any(p.is_alive() for p in processes)
             while not Q.empty():
@@ -228,17 +243,21 @@ def step(R, I, V, spin, dx, dt, axes):
                 break
 
         # Start solving for the Real component
+        if VERBOSE: print("Solving for R")
         Rnew = np.zeros(R.shape)
         Q = Queue()
 
         # Generate processes
         processes = []
         for arg in args:
-            processes.append(Process(target=process,args=(oneStepReal,Q,arg,R,Inew,V,spin,dx,dt,axes)))
+            processes.append(Process(target=process,args=(oneStepReal,Q,arg,R,Inew,V,spin,dx,dt,axes,VERBOSE)))
         
+        if VERBOSE: print("Starting processes")
         for p in processes:
             p.start()
+            if VERBOSE: print("\t",p.name," started.")
 
+        if VERBOSE: print("Reassembling")
         while True:
             running = any(p.is_alive() for p in processes)
             while not Q.empty():
@@ -253,8 +272,6 @@ def step(R, I, V, spin, dx, dt, axes):
     return Rnew, Inew, prob
 
 
-
-
 ## Start Qt event loop unless running in interactive mode.
 if __name__ == '__main__':
     
@@ -262,8 +279,8 @@ if __name__ == '__main__':
     #########################################################
     # To solve the wavefuncion
     # Simulation parameters
-    dx = 0.05
-    dt = 1e-5
+    dx = 0.025
+    dt = 1e-4
 
     dim = int(3)
 
@@ -294,18 +311,24 @@ if __name__ == '__main__':
     axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
 
     # Initial conditions
+    print("Getting V")
     V = getV(axes)
 
+    print("Getting psi0")
     psi = getPsi0(axes,K=Kbar)
 
+    print("Getting Components")
     R = psi.real
     Iprev = psi.imag
 
     # Do half a time step to calculate the leapfrog imaginary.
+    print("Doing half a step")
     I = stepImag(R, Iprev, V, spin, dx, dt/2, axes)
+    print("Calculating Probability")
     prob = R**2 + Iprev*I
 
-
+    # R,I,prob = step(R,I,V,spin,dx,dt,axes)
+    # R,I,prob = step(R,I,V,spin,dx,dt,axes)
 
     #########################################################
     #########################################################
@@ -316,7 +339,7 @@ if __name__ == '__main__':
     plotevery = 1
     level = 1.5
     Z = 0.5
-    EXPORT = True
+    EXPORT = False
 
     # Qt Setup
     app = QtGui.QApplication([])
@@ -375,7 +398,6 @@ if __name__ == '__main__':
 
     slice.addItem(s)
 
-
     i = 0
     def update():
         global R, I, prob, i
@@ -394,7 +416,7 @@ if __name__ == '__main__':
             s.setData(z=prob[:][:][sl]/prob.max())
             # Exporting
             if EXPORT: w.grabFrameBuffer().save('frames/frame'+str(i)+'.png')
-        i += 1
+        i+=1
 
     timer = QtCore.QTimer()
     timer.timeout.connect(update)
