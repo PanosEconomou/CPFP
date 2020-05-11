@@ -203,6 +203,23 @@ def process(Q,axes,args,Jp,dx,mu0=c.mu_0,delta=1e-3):
     return
 
 
+def export(axes,B,filename):
+    file = open(filename,'w+')
+    
+    Nx = len(axes[0])
+    Ny = len(axes[1])
+    Nz = len(axes[2])
+
+    print("Exporting Started")
+    for i in tqdm(range(0,Nx)):
+        for j in range(0,Ny):
+            for k in range(0,Nz):
+                x = str(axes[0][i])
+                y = str(axes[1][j])
+                z = str(axes[2][k])
+                file.write(x+","+y+","+z+","+str(B[i][j][k])+"\n")
+
+    file.close()
 
 ########################################################
 ########################################################
@@ -258,7 +275,7 @@ def plot(axes,J,B):
 if __name__ == '__main__':
 
     L = 2
-    dx = 0.1
+    dx = 0.5
     mu0 = c.mu_0
     delta = 1e-3
 
@@ -272,6 +289,8 @@ if __name__ == '__main__':
 
     B = solveB(axes,Jp,dx,mu0,delta)
     print(B.max())
+
+    export(axes,B,"Bfield.txt")
 
     plot(axes,J,B)
 

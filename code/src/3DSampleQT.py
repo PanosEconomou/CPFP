@@ -4,11 +4,14 @@ import scipy.constants as c
 from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
+import pyqtgraph.exporters
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
+# from numba import jit, cuda 
 # from BS import *
 
-MULTIPROCESSING = True
+MULTIPROCESSING = False
 CPUs = 4
 
 if MULTIPROCESSING:
@@ -47,7 +50,7 @@ def getPsi0(axes, K=None, C: float = 1, x0=None, s0=0.5e-2**0.5):
     if x0 == None:
         x0 = np.zeros(dim)
         x0[0] = 0.5
-        x0[1] = 0.5
+        x0[1] = 0.2
         x0[2] = 0.5
 
     psi0 = np.zeros((Nx, Ny, Nz))*1j
@@ -99,10 +102,30 @@ def getV(axes, r=0.3, x0=np.array([0.5, 0.5, 0.5])):
 
     return V
 
-# def getBformfile(filename):
-    
+# Finds the nearest index on an array based on value
+def neari(array, value):
+    array = np.asarray(array)
+    idx = ([np.mag(arr - value) for arr in array]).argmin()
+    return idx
 
-def B(x,y,z,B0 = 1e4, a = 10000, beta = 1):
+
+def getBformfile(axes,filename):
+    data = pd.read_csv(filename).to_numpy().T
+    
+    Nx = len(axes[0])
+    Ny = len(axes[1])
+    Nz = len(axes[2])
+
+    B = np.zeros((Nx,Ny,Nz,3))
+    for i in range(Nx):
+        for j in range(Ny):
+            for k in range(Nz):
+                r = np.array([axes[0][i],axes[1][j],axes[2][k]])
+                B[i][j][k] = data[neari(data,r)]
+
+    return B
+
+def B(x,y,z,B0 = 10000, a = 1000, beta = 1):
     return np.array([-a*x,0,B0+a*z])/beta
 
 #########################################################
@@ -110,8 +133,7 @@ def B(x,y,z,B0 = 1e4, a = 10000, beta = 1):
 # Simulation functions
 
 # Perform a step of the imaginary wavefuntion
-
-
+# @jit(target ="cuda")
 def stepImag(R, I, V, spin, dx, dt, axes):
     Inew = np.zeros(I.shape)
     #Do everything but the boundary
@@ -139,6 +161,7 @@ def oneStepImag(i,j,k,R,I,V,spin,dx,dt,axes):
 
 
 # Perform a step of the real wavefuntion
+# @jit(target ="cuda")
 def stepReal(R, I, V, spin, dx, dt, axes):
     Rnew = np.zeros(R.shape)
     #Do everything but the boundary
@@ -240,12 +263,12 @@ if __name__ == '__main__':
     # To solve the wavefuncion
     # Simulation parameters
     dx = 0.05
-    dt = 1e-4
+    dt = 1e-5
 
     dim = int(3)
 
     # Nonedimentionalisation
-    m = c.m_e   # Particle mass in Kg
+    m = 1.7911934e-25 #c.m_e   # Particle mass in Kg
     q = c.e     # Particle charge in C (As)
 
     beta = 1    # B = beta*Bbar (Nondimentionalisation constant for B)
@@ -255,13 +278,18 @@ if __name__ == '__main__':
 
     L0      = (hbar/(m*gamma*beta))**0.5     # Nondimentionalised Length Coefficient
     T0      = 1/(gamma*beta)                 # Nondimentionalised Time Coefficient
-    spin    = np.array([1/2,0,1/2])         # Nondimentionalised spin
+    spin    = np.array([-1/2,0,1/2])         # Nondimentionalised spin
     L       = 1                              # Nondimentionalised container length
     time    = 10                             # Nondimentionalised time
     
-    v0 = np.array([0,1e-10,0])*L0/T0
+    v0 = np.array([0,1e-5,0])*L0/T0 #123111
     Kbar = v0/L0
-    print(Kbar)
+    print("K : ", Kbar)
+    print("lamba: ",2*np.pi/mag(Kbar))
+    print("r0: ", L0)
+    print("t0: ", T0)
+    print("B : ", beta)
+    print("s : ", spin)
 
     axes, grid = getGrid(dx, Lx=1, Ly=1, Lz=1)
 
@@ -288,6 +316,7 @@ if __name__ == '__main__':
     plotevery = 1
     level = 1.5
     Z = 0.5
+    EXPORT = True
 
     # Qt Setup
     app = QtGui.QApplication([])
@@ -295,7 +324,7 @@ if __name__ == '__main__':
     w.show()
     w.setWindowTitle('pyqtgraph example: GLIsosurface')
 
-    w.setCameraPosition(distance=20)
+    w.setCameraPosition(azimuth=0,distance=20)
 
     g = gl.GLGridItem()
     g.scale(0.5, 0.5, 1)
@@ -346,6 +375,7 @@ if __name__ == '__main__':
 
     slice.addItem(s)
 
+
     i = 0
     def update():
         global R, I, prob, i
@@ -362,6 +392,8 @@ if __name__ == '__main__':
             m1.meshDataChanged()
             
             s.setData(z=prob[:][:][sl]/prob.max())
+            # Exporting
+            if EXPORT: w.grabFrameBuffer().save('frames/frame'+str(i)+'.png')
         i += 1
 
     timer = QtCore.QTimer()
