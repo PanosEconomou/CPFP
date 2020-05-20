@@ -8,7 +8,7 @@ from tqdm import tqdm
 import time
 
 MULTIPROCESSING = True
-CPUs = 4
+CPUs = 112
 
 if MULTIPROCESSING:
     from multiprocessing import Process, Queue
@@ -54,8 +54,8 @@ def getJ(axes,w=0.5,h=0.5,H=0.5,D=0.5):
     J = np.zeros((Nx,Ny,Nz,3))
 
     # # Uncomment for a linear current
-    # for i in range(0,Nx):
-    #     J[i][int(Ny/2)][int(Nz/2)] = np.array([1,0,0])
+    # for i in range(0,Ny):
+    #    J[Nx/2][i][int(Nz/2)] = np.array([0,1,0])
 
     # # Uncomment for a circular current
     # x0=np.array([0.5,0.5,0.5])
@@ -217,7 +217,7 @@ def export(axes,B,filename):
                 x = str(axes[0][i])
                 y = str(axes[1][j])
                 z = str(axes[2][k])
-                file.write(x+","+y+","+z+","+str(B[i][j][k])+"\n")
+                file.write(x+","+y+","+z+","+str(B[i][j][k][0])+","+str(B[i][j][k][1])+","+str(B[i][j][k][2])+"\n")
 
     file.close()
 
@@ -257,7 +257,7 @@ def plot(axes,J,B):
             Bmag[i][j] = mag(B[i][nY][j])
 
     ax2 = fig.add_subplot(122)
-    ax2.imshow(np.rot90(Bmag, k=1, axes=(0, 1)),cmap='hot')
+    ax2.imshow(np.rot90(Bmag, k=1),cmap='hot')
     ax2.set_title('Slice at Y = %.2f'%Y)
     ax2.set_xlabel('x-axis')
     ax2.set_ylabel('y-axis')
@@ -275,7 +275,7 @@ def plot(axes,J,B):
 if __name__ == '__main__':
 
     L = 2
-    dx = 0.5
+    dx = 0.2
     mu0 = c.mu_0
     delta = 1e-3
 
@@ -284,13 +284,13 @@ if __name__ == '__main__':
     J = getJ(axes,w=1,h=0.5,H=0.5)
     Jp = getJProcessed(axes,dx,J)
 
-    # dx = 0.2
-    # axes,grid = getGrid(dx,(0.5,1.5),(0,1),(0.5,1.5))
+    #dx = 0.02
+    #axes,grid = getGrid(dx,(0,L),(0,L),(0,L))
 
     B = solveB(axes,Jp,dx,mu0,delta)
     print(B.max())
 
-    export(axes,B,"Bfield.txt")
+    export(axes,B,"Bfield_Linear.txt")
 
     plot(axes,J,B)
 
