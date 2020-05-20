@@ -21,16 +21,16 @@ x = np.linspace(0,M,int(M/dx))
 V = np.zeros(len(x))
 # V[int(0.6/dx):int(0.7/dx)] = 1000
 V[0] = 1e10
-V[int(len(V)*0.6):int(len(V)*0.8)] = 1e6
+V[int(len(V)*0.6):int(len(V)*0.8)] = 0*1e6
 
 # Initial condition
 m  = 1 #c.electron_mass
 k0 = 500
 w0 = 0
-x0 = 0.4
+x0 = 0.5
 s  = 1e-3**0.5
 C = 10#1/(s*(2*np.pi)**0.5)
-psi0 = C*np.exp(-(x-x0)**2/(s**2))*np.exp(k0*x*1j)
+psi0 = C*np.exp(-(x-x0)**2/(s**2))#*np.exp(k0*x*1j)
 
 R0 = psi0.real
 R0[0] = 0
@@ -128,5 +128,6 @@ def update(i):
     return plot, #plotR, plotI
 
 
-anim = animation.FuncAnimation(fig, update, init_func=initAnim, frames=int(time/dt), interval=1, blit=False)
+anim = animation.FuncAnimation(fig, update, init_func=initAnim, frames=int(500), interval=1, blit=False)
+anim.save("1D_STATIONARY.mp4", fps=30, writer='ffmpeg')
 plt.show()

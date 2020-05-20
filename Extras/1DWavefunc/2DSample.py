@@ -46,7 +46,7 @@ def getV(axes,r = 0.05, x0 = [0.5,0.5]):
             y = axes[0][j]
 
             if ((x-x0[0])**2+(y-x0[1])**2)**0.5 <= r:
-                V[i][j] = 0*1e4
+                V[i][j] = 1e4
 
             # x1 = 0.8
             # x2 = 0.5
@@ -182,6 +182,6 @@ def update(i):
 
 # anim = animation.FuncAnimation(fig, update, init_func=animInit, frames=int(time/dt), interval=1, blit=False)
 anim = animation.FuncAnimation(fig, update, frames=500, interval=20, blit=False)
-# anim.save("example1.gif", fps=30, writer='imagemagick')
+anim.save("2D_BARRIER.mp4", fps=30, writer='ffmpeg')
 
 plt.show()
