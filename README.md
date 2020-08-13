@@ -1,2 +1,2 @@
 # CPFP
-Repository for the code on computational physics final project on calculating wavefuncitons in a stern gerlach apparatus.
+Numerical Simulation of Stern Gerlach Exeriment from scratch. Contains custom permanent magnet magnetic field sover, and 3D time-dependent wavefunction solver.
